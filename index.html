@@ -13,8 +13,8 @@
             background-color: #020617; 
             color: #f8fafc;
             margin: 0;
+            overflow-x: hidden;
         }
-        .progress-bar { transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1); }
         .progress-bar-transition { transition: width 0.8s cubic-bezier(0.65, 0, 0.35, 1); }
         .fade-in { animation: fadeIn 0.4s ease-out; }
         .slide-in { animation: slideIn 0.5s cubic-bezier(0.23, 1, 0.32, 1); }
@@ -34,20 +34,261 @@
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #334155; }
     </style>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
 </head>
 <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+
+    <!-- Carregamento do React e Babel para processar JSX no navegador -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+
+        // --- MOCK DATA & CONFIG ---
+        const INITIAL_QUIZ_CONFIG = {
+            id: 'fitness-funnel-1',
+            title: 'Avaliação de Perfil 2025',
+            calculationMethod: 'SUM',
+            primaryColor: '#2563eb'
+        };
+
+        const INITIAL_QUESTIONS = [
+            {
+                id: 'q1',
+                text: 'Qual seu nível de experiência atual?',
+                description: 'Selecione a opção que melhor define sua jornada.',
+                imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
+                order: 1,
+                active: true,
+                answers: [
+                    { id: 'a1', text: 'Iniciante Total', points: 10, category: 'Beginner', imageUrl: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80' },
+                    { id: 'a2', text: 'Pratico às vezes', points: 20, category: 'Inter', imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80' },
+                    { id: 'a3', text: 'Intermediário', points: 30, category: 'Inter', imageUrl: 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=400&q=80' },
+                    { id: 'a4', text: 'Avançado / Pro', points: 40, category: 'Advanced', imageUrl: 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=400&q=80' }
+                ]
+            }
+        ];
+
+        const INITIAL_RESULTS = [
+            {
+                id: 'res1',
+                title: 'Seu Diagnóstico Está Pronto!',
+                description: 'Com base nas suas respostas, você possui um perfil de alto potencial. Recomendamos o protocolo de 90 dias.',
+                minPoints: 0,
+                maxPoints: 100,
+                ctaText: 'ACESSAR MEU PROTOCOLO AGORA',
+                ctaUrl: '#',
+                imageUrl: 'https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=800&q=80'
+            }
+        ];
+
+        // --- COMPONENTS ---
+
+        const QuizUI = ({ config, questions, results }) => {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [userAnswers, setUserAnswers] = useState([]);
+            const [isFinished, setIsFinished] = useState(false);
+            const [isTransitioning, setIsTransitioning] = useState(false);
+
+            const activeQuestions = useMemo(() => 
+                questions.filter(q => q.active).sort((a, b) => a.order - b.order),
+            [questions]);
+
+            const progress = ((currentIndex + 1) / (activeQuestions.length || 1)) * 100;
+            const currentQuestion = activeQuestions[currentIndex];
+
+            const handleAnswer = (answer) => {
+                if (isTransitioning) return;
+                setIsTransitioning(true);
+                
+                setTimeout(() => {
+                    const updatedAnswers = [...userAnswers, { points: answer.points, category: answer.category }];
+                    setUserAnswers(updatedAnswers);
+
+                    if (currentIndex < activeQuestions.length - 1) {
+                        setCurrentIndex(currentIndex + 1);
+                        setIsTransitioning(false);
+                    } else {
+                        setIsFinished(true);
+                    }
+                }, 400);
+            };
+
+            if (isFinished) {
+                const totalPoints = userAnswers.reduce((sum, ans) => sum + ans.points, 0);
+                const result = results.find(r => totalPoints >= (r.minPoints || 0) && totalPoints <= (r.maxPoints || 9999)) || results[0];
+
+                return (
+                    <div className="max-w-2xl mx-auto px-4 py-12 slide-in">
+                        <div className="bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-800 overflow-hidden">
+                            {result.imageUrl && <img src={result.imageUrl} className="w-full h-64 object-cover" />}
+                            <div className="p-8 md:p-12 text-center">
+                                <h2 className="text-3xl font-black mb-6">{result.title}</h2>
+                                <p className="text-slate-400 mb-8 bg-slate-800/50 p-6 rounded-2xl">{result.description}</p>
+                                <a href={result.ctaUrl} className="block w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl transition-all scale-100 hover:scale-[1.02] active:scale-95">
+                                    {result.ctaText}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!currentQuestion) return <div className="text-center py-20 font-black">QUESTÕES NÃO ENCONTRADAS</div>;
+
+            return (
+                <div className="max-w-2xl mx-auto px-4 py-8 md:py-16">
+                    <div className="mb-10">
+                        <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                            <span>QUESTÃO {currentIndex + 1} DE {activeQuestions.length}</span>
+                            <span>{Math.round(progress)}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 progress-bar-transition shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${progress}%` }} />
+                        </div>
+                    </div>
+
+                    <div className={`transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+                        <div className="text-center mb-10">
+                            {currentQuestion.imageUrl && <img src={currentQuestion.imageUrl} className="w-full h-48 md:h-64 object-cover rounded-[2rem] mb-8 border border-slate-800 shadow-2xl" />}
+                            <h1 className="text-2xl md:text-4xl font-black mb-4 leading-tight">{currentQuestion.text}</h1>
+                            <p className="text-slate-400 text-sm md:text-base">{currentQuestion.description}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {currentQuestion.answers.map(ans => (
+                                <button key={ans.id} onClick={() => handleAnswer(ans)} className="group bg-slate-900 border-2 border-slate-800 hover:border-blue-500 rounded-2xl overflow-hidden transition-all active:scale-95 shadow-lg">
+                                    {ans.imageUrl && <img src={ans.imageUrl} className="w-full h-32 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />}
+                                    <div className="p-4 text-center font-bold text-xs uppercase tracking-wide text-slate-300 group-hover:text-white">{ans.text}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AdminPanel = ({ config, questions, results, onUpdateQuestions, onUpdateResults, onLogout }) => {
+            const [activeTab, setActiveTab] = useState('questions');
+
+            const addQuestion = () => {
+                const newQ = { id: Date.now().toString(), text: 'Nova Pergunta', description: '', order: questions.length + 1, active: true, answers: [] };
+                onUpdateQuestions([...questions, newQ]);
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto p-4 md:p-8">
+                    <header className="flex justify-between items-center mb-8 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+                        <h1 className="text-xl font-black uppercase tracking-tighter">Painel Admin</h1>
+                        <button onClick={onLogout} className="text-red-400 font-bold text-xs hover:bg-red-400/10 px-4 py-2 rounded-lg transition-all">SAIR</button>
+                    </header>
+
+                    <div className="flex space-x-2 mb-8 bg-slate-900 p-1.5 rounded-xl border border-slate-800 w-fit">
+                        {['questions', 'results'].map(tab => (
+                            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-800'}`}>
+                                {tab === 'questions' ? 'Perguntas' : 'Resultados'}
+                            </button>
+                        ))}
+                    </div>
+
+                    {activeTab === 'questions' ? (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-xl font-black">Gerenciar Perguntas</h2>
+                                <button onClick={addQuestion} className="bg-blue-600 px-6 py-2.5 rounded-xl font-bold text-sm">+ Nova Pergunta</button>
+                            </div>
+                            {questions.map(q => (
+                                <div key={q.id} className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-lg">
+                                    <input value={q.text} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, text: e.target.value} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 font-bold mb-4 outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {q.answers.map(ans => (
+                                            <div key={ans.id} className="flex gap-2 bg-slate-800/50 p-2 rounded-xl border border-slate-800">
+                                                <input value={ans.text} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: item.answers.map(a => a.id === ans.id ? {...a, text: e.target.value} : a)} : item))} className="flex-1 bg-transparent text-xs font-bold outline-none" />
+                                                <input type="number" value={ans.points} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: item.answers.map(a => a.id === ans.id ? {...a, points: parseInt(e.target.value)} : a)} : item))} className="w-12 bg-slate-800 rounded text-center text-xs" />
+                                            </div>
+                                        ))}
+                                        <button onClick={() => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: [...item.answers, {id: Date.now().toString(), text: 'Nova Resposta', points: 0, category: ''}]} : item))} className="text-[10px] font-black uppercase text-blue-400 py-2 border border-dashed border-blue-400/30 rounded-xl hover:bg-blue-400/5">+ Adicionar Opção</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {results.map(r => (
+                                <div key={r.id} className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl">
+                                    <input value={r.title} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, title: e.target.value} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 font-black text-xl mb-4 outline-none" />
+                                    <textarea value={r.description} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, description: e.target.value} : item))} className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 text-slate-400 text-sm h-32 outline-none" />
+                                    <div className="mt-4 flex gap-4">
+                                        <input value={r.ctaUrl} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, ctaUrl: e.target.value} : item))} className="flex-1 bg-slate-800 p-3 rounded-xl border border-slate-700 text-blue-400 text-xs" placeholder="URL do Botão" />
+                                        <input type="number" value={r.minPoints} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, minPoints: parseInt(e.target.value)} : item))} className="w-24 bg-slate-800 p-3 rounded-xl border border-slate-700 text-center" placeholder="Min Pts" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [password, setPassword] = useState('');
+            const [questions, setQuestions] = useState(() => {
+                const saved = localStorage.getItem('quiz_questions');
+                return saved ? JSON.parse(saved) : INITIAL_QUESTIONS;
+            });
+            const [results, setResults] = useState(() => {
+                const saved = localStorage.getItem('quiz_results');
+                return saved ? JSON.parse(saved) : INITIAL_RESULTS;
+            });
+
+            useEffect(() => {
+                localStorage.setItem('quiz_questions', JSON.stringify(questions));
+                localStorage.setItem('quiz_results', JSON.stringify(results));
+            }, [questions, results]);
+
+            return (
+                <div className="min-h-screen">
+                    <nav className="fixed top-4 right-4 z-50 flex gap-2">
+                        <button onClick={() => { setIsAdmin(!isAdmin); setIsLoggedIn(false); }} className="px-4 py-2 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all shadow-xl">
+                            {isAdmin ? 'Voltar ao Quiz' : 'Painel Admin'}
+                        </button>
+                    </nav>
+
+                    {!isAdmin ? (
+                        <main className="pt-10">
+                            <QuizUI questions={questions} results={results} config={INITIAL_QUIZ_CONFIG} />
+                        </main>
+                    ) : !isLoggedIn ? (
+                        <div className="min-h-screen flex items-center justify-center p-4">
+                            <form onSubmit={e => { e.preventDefault(); if (password === 'admin123') setIsLoggedIn(true); else alert('Senha: admin123'); }} className="bg-slate-900 p-8 rounded-3xl border border-slate-800 w-full max-w-sm shadow-2xl">
+                                <h2 className="text-2xl font-black mb-6 text-center">Admin Access</h2>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-xl mb-6 text-center font-bold outline-none" placeholder="Senha: admin123" />
+                                <button className="w-full py-4 bg-blue-600 rounded-xl font-black uppercase tracking-widest text-xs">Entrar</button>
+                            </form>
+                        </div>
+                    ) : (
+                        <AdminPanel 
+                            config={INITIAL_QUIZ_CONFIG}
+                            questions={questions} 
+                            results={results} 
+                            onUpdateQuestions={setQuestions} 
+                            onUpdateResults={setResults}
+                            onLogout={() => { setIsLoggedIn(false); setIsAdmin(false); }} 
+                        />
+                    )}
+                    
+                    <footer className="text-center py-12 opacity-20 text-[10px] font-black uppercase tracking-[0.4em] pointer-events-none">
+                        &copy; 2025 ConversionQuiz Pro • Premium Funnel
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
