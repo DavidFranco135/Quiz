@@ -1,0 +1,305 @@
+
+import React, { useState, useRef } from 'react';
+import { Question, ResultRule, QuizConfig, Answer } from '../types';
+
+interface AdminPanelProps {
+  config: QuizConfig;
+  questions: Question[];
+  results: ResultRule[];
+  onUpdateQuestions: (qs: Question[]) => void;
+  onUpdateResults: (rs: ResultRule[]) => void;
+  onLogout: () => void;
+}
+
+export const AdminPanel: React.FC<AdminPanelProps> = ({ 
+  config, questions, results, onUpdateQuestions, onUpdateResults, onLogout 
+}) => {
+  const [activeTab, setActiveTab] = useState<'questions' | 'results' | 'config'>('questions');
+  const [editingImageUrl, setEditingImageUrl] = useState<{type: 'q' | 'a' | 'r', id: string, subId?: string} | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const addQuestion = () => {
+    const newQ: Question = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: 'Nova Pergunta',
+      order: questions.length + 1,
+      active: true,
+      answers: []
+    };
+    onUpdateQuestions([...questions, newQ]);
+  };
+
+  const updateQuestionField = (id: string, field: keyof Question, value: any) => {
+    onUpdateQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q));
+  };
+
+  const addAnswer = (qId: string) => {
+    onUpdateQuestions(questions.map(q => {
+      if (q.id === qId) {
+        const newA: Answer = { id: Math.random().toString(36).substr(2, 9), text: 'Nova Resposta', points: 0, category: 'Default' };
+        return { ...q, answers: [...q.answers, newA] };
+      }
+      return q;
+    }));
+  };
+
+  const updateAnswerField = (qId: string, aId: string, field: keyof Answer, value: any) => {
+    onUpdateQuestions(questions.map(q => {
+      if (q.id === qId) {
+        const answers = q.answers.map(a => a.id === aId ? { ...a, [field]: value } : a);
+        return { ...q, answers };
+      }
+      return q;
+    }));
+  };
+
+  const addResult = () => {
+    const newR: ResultRule = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'Novo Resultado',
+      description: 'Descrição personalizada para este resultado.',
+      minPoints: 0,
+      maxPoints: 100,
+      ctaText: 'Comprar Agora',
+      ctaUrl: '#'
+    };
+    onUpdateResults([...results, newR]);
+  };
+
+  const updateResultField = (id: string, field: keyof ResultRule, value: any) => {
+    onUpdateResults(results.map(r => r.id === id ? { ...r, [field]: value } : r));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingImageUrl) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      if (editingImageUrl.type === 'q') {
+        updateQuestionField(editingImageUrl.id, 'imageUrl', base64String);
+      } else if (editingImageUrl.type === 'a') {
+        updateAnswerField(editingImageUrl.id, editingImageUrl.subId!, 'imageUrl', base64String);
+      } else if (editingImageUrl.type === 'r') {
+        updateResultField(editingImageUrl.id, 'imageUrl', base64String);
+      }
+      setEditingImageUrl(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const PhotoIcon = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8">
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept="image/*" 
+        onChange={handleFileUpload}
+      />
+
+      {editingImageUrl && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 px-4">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 w-full max-w-md shadow-2xl">
+            <h3 className="text-xl font-bold mb-4 text-white">Adicionar Imagem</h3>
+            
+            <div className="space-y-4">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center space-x-2 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl transition-colors font-bold text-white shadow-lg"
+              >
+                <PhotoIcon />
+                <span>Enviar do Dispositivo</span>
+              </button>
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="flex-shrink mx-4 text-slate-500 text-xs font-bold uppercase">ou use uma URL</span>
+                <div className="flex-grow border-t border-slate-800"></div>
+              </div>
+
+              <input 
+                autoFocus
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none text-white text-sm"
+                placeholder="https://exemplo.com/foto.jpg"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const url = (e.target as HTMLInputElement).value;
+                    if (editingImageUrl.type === 'q') updateQuestionField(editingImageUrl.id, 'imageUrl', url);
+                    else if (editingImageUrl.type === 'a') updateAnswerField(editingImageUrl.id, editingImageUrl.subId!, 'imageUrl', url);
+                    else if (editingImageUrl.type === 'r') updateResultField(editingImageUrl.id, 'imageUrl', url);
+                    setEditingImageUrl(null);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button onClick={() => setEditingImageUrl(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-colors">Cancelar</button>
+              <button onClick={() => {
+                const input = document.querySelector('input[placeholder="https://exemplo.com/foto.jpg"]') as HTMLInputElement;
+                if (editingImageUrl.type === 'q') updateQuestionField(editingImageUrl.id, 'imageUrl', input.value);
+                else if (editingImageUrl.type === 'a') updateAnswerField(editingImageUrl.id, editingImageUrl.subId!, 'imageUrl', input.value);
+                else if (editingImageUrl.type === 'r') updateResultField(editingImageUrl.id, 'imageUrl', input.value);
+                setEditingImageUrl(null);
+              }} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl font-bold transition-colors">Salvar URL</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto">
+        <header className="flex justify-between items-center mb-8 bg-slate-900 p-6 rounded-2xl border border-slate-800">
+          <div>
+            <h1 className="text-2xl font-black text-white">Admin Dashboard</h1>
+            <p className="text-slate-400 text-sm">Controle total do Funil de Conversão</p>
+          </div>
+          <button onClick={onLogout} className="px-4 py-2 text-sm font-bold text-red-400 hover:bg-red-400/10 rounded-lg transition-all">Sair</button>
+        </header>
+
+        <div className="flex space-x-2 mb-8 bg-slate-900 p-1.5 rounded-xl border border-slate-800 w-fit">
+          {['questions', 'results', 'config'].map((tab: any) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
+            >
+              {tab === 'questions' ? 'Perguntas' : tab === 'results' ? 'Resultados' : 'Geral'}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'questions' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-black text-white">Perguntas do Quiz</h2>
+              <button onClick={addQuestion} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20">+ Nova Pergunta</button>
+            </div>
+            
+            {questions.sort((a,b) => a.order - b.order).map(q => (
+              <div key={q.id} className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8">
+                  <div className="md:col-span-9">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Título da Pergunta</label>
+                    <div className="relative group">
+                      <input 
+                        type="text" value={q.text} 
+                        onChange={e => updateQuestionField(q.id, 'text', e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-white font-bold"
+                      />
+                      <button onClick={() => setEditingImageUrl({type: 'q', id: q.id})} className={`absolute right-3 top-3 transition-colors ${q.imageUrl ? 'text-green-400' : 'text-slate-500 hover:text-blue-400'}`}><PhotoIcon /></button>
+                    </div>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Ordem</label>
+                    <input type="number" value={q.order} onChange={e => updateQuestionField(q.id, 'order', parseInt(e.target.value))} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">Respostas</h4>
+                  {q.answers.map(a => (
+                    <div key={a.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-slate-800/40 p-4 rounded-xl border border-slate-800">
+                      <div className="md:col-span-6 relative">
+                        <input value={a.text} onChange={e => updateAnswerField(q.id, a.id, 'text', e.target.value)} className="w-full bg-slate-800 border border-slate-700 p-2.5 rounded-lg text-sm outline-none" placeholder="Texto da resposta" />
+                        <button onClick={() => setEditingImageUrl({type: 'a', id: q.id, subId: a.id})} className={`absolute right-2 top-2.5 scale-75 ${a.imageUrl ? 'text-green-400' : 'text-slate-500'}`}><PhotoIcon /></button>
+                      </div>
+                      <input type="number" value={a.points} onChange={e => updateAnswerField(q.id, a.id, 'points', parseInt(e.target.value))} className="md:col-span-2 bg-slate-800 border border-slate-700 p-2.5 rounded-lg text-sm outline-none" placeholder="Pts" />
+                      <input value={a.category} onChange={e => updateAnswerField(q.id, a.id, 'category', e.target.value)} className="md:col-span-3 bg-slate-800 border border-slate-700 p-2.5 rounded-lg text-sm outline-none" placeholder="Tag" />
+                      <button onClick={() => updateQuestionField(q.id, 'answers', q.answers.filter(ans => ans.id !== a.id))} className="md:col-span-1 text-red-400 hover:text-red-300 transition-colors flex justify-center">✕</button>
+                    </div>
+                  ))}
+                  <button onClick={() => addAnswer(q.id)} className="text-blue-400 text-xs font-black uppercase tracking-widest hover:text-blue-300">+ Adicionar Opção</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'results' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-black text-white">Configuração de Resultados</h2>
+              <button onClick={addResult} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg">+ Novo Resultado</button>
+            </div>
+
+            {results.map(r => (
+              <div key={r.id} className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Título do Resultado</label>
+                      <input value={r.title} onChange={e => updateResultField(r.id, 'title', e.target.value)} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none text-white font-bold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Descrição / Diagnóstico</label>
+                      <textarea value={r.description} onChange={e => updateResultField(r.id, 'description', e.target.value)} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none text-slate-300 text-sm h-32" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Pontuação Mínima</label>
+                        <input type="number" value={r.minPoints} onChange={e => updateResultField(r.id, 'minPoints', parseInt(e.target.value))} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Pontuação Máxima</label>
+                        <input type="number" value={r.maxPoints} onChange={e => updateResultField(r.id, 'maxPoints', parseInt(e.target.value))} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Texto do Botão (CTA)</label>
+                      <input value={r.ctaText} onChange={e => updateResultField(r.id, 'ctaText', e.target.value)} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Link de Destino (URL)</label>
+                      <input value={r.ctaUrl} onChange={e => updateResultField(r.id, 'ctaUrl', e.target.value)} className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none text-blue-400" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                  <button 
+                    onClick={() => setEditingImageUrl({type: 'r', id: r.id})}
+                    className="flex items-center space-x-2 text-slate-400 hover:text-white transition-colors text-sm"
+                  >
+                    <PhotoIcon />
+                    <span>{r.imageUrl ? 'Trocar Imagem do Resultado' : 'Adicionar Imagem do Resultado'}</span>
+                  </button>
+                  <button onClick={() => onUpdateResults(results.filter(res => res.id !== r.id))} className="text-red-400 hover:text-red-300 text-xs font-bold uppercase tracking-widest">Remover Resultado</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'config' && (
+          <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl">
+             <h2 className="text-xl font-black text-white mb-6">Configurações Gerais do Quiz</h2>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Título do Projeto</label>
+                   <input className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none text-white" defaultValue={config.title} />
+                </div>
+                <div>
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Método de Cálculo</label>
+                   <select className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl outline-none text-white">
+                      <option value="SUM">Soma de Pontos (Recomendado)</option>
+                      <option value="MAJORITY_CATEGORY">Maioria por Categoria</option>
+                   </select>
+                </div>
+             </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
