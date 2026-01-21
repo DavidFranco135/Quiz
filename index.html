@@ -38,7 +38,6 @@
 <body>
     <div id="root"></div>
 
-    <!-- Carregamento do React e Babel para processar JSX no navegador -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -46,7 +45,6 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        // --- MOCK DATA & CONFIG ---
         const INITIAL_QUIZ_CONFIG = {
             id: 'fitness-funnel-1',
             title: 'Avaliação de Perfil 2025',
@@ -75,16 +73,14 @@
             {
                 id: 'res1',
                 title: 'Seu Diagnóstico Está Pronto!',
-                description: 'Com base nas suas respostas, você possui um perfil de alto potencial. Recomendamos o protocolo de 90 dias.',
+                description: 'Com base nas suas respostas, você possui um perfil de alto potencial. Clique abaixo para ver suas receitas exclusivas.',
                 minPoints: 0,
-                maxPoints: 100,
-                ctaText: 'ACESSAR MEU PROTOCOLO AGORA',
-                ctaUrl: '#',
+                maxPoints: 500,
+                ctaText: 'VER MINHAS RECEITAS AGORA',
+                ctaUrl: 'https://apaixonadosporshihtzu.com/receitas/',
                 imageUrl: 'https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=800&q=80'
             }
         ];
-
-        // --- COMPONENTS ---
 
         const QuizUI = ({ config, questions, results }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -171,6 +167,26 @@
 
         const AdminPanel = ({ config, questions, results, onUpdateQuestions, onUpdateResults, onLogout }) => {
             const [activeTab, setActiveTab] = useState('questions');
+            const [editingImg, setEditingImg] = useState(null);
+            const fileInputRef = useRef(null);
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !editingImg) return;
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64 = reader.result;
+                    if (editingImg.type === 'q') {
+                        onUpdateQuestions(questions.map(q => q.id === editingImg.id ? { ...q, imageUrl: base64 } : q));
+                    } else if (editingImg.type === 'a') {
+                        onUpdateQuestions(questions.map(q => q.id === editingImg.id ? { ...q, answers: q.answers.map(a => a.id === editingImg.subId ? { ...a, imageUrl: base64 } : a) } : q));
+                    } else {
+                        onUpdateResults(results.map(r => r.id === editingImg.id ? { ...r, imageUrl: base64 } : r));
+                    }
+                    setEditingImg(null);
+                };
+                reader.readAsDataURL(file);
+            };
 
             const addQuestion = () => {
                 const newQ = { id: Date.now().toString(), text: 'Nova Pergunta', description: '', order: questions.length + 1, active: true, answers: [] };
@@ -179,6 +195,18 @@
 
             return (
                 <div className="max-w-6xl mx-auto p-4 md:p-8">
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+                    
+                    {editingImg && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl text-center">
+                                <h3 className="text-xl font-black mb-6">Mudar Imagem</h3>
+                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-4 bg-blue-600 rounded-xl font-bold mb-4">Upload do Dispositivo</button>
+                                <button onClick={() => setEditingImg(null)} className="w-full py-4 bg-slate-800 rounded-xl font-bold">Cancelar</button>
+                            </div>
+                        </div>
+                    )}
+
                     <header className="flex justify-between items-center mb-8 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                         <h1 className="text-xl font-black uppercase tracking-tighter">Painel Admin</h1>
                         <button onClick={onLogout} className="text-red-400 font-bold text-xs hover:bg-red-400/10 px-4 py-2 rounded-lg transition-all">SAIR</button>
@@ -200,12 +228,23 @@
                             </div>
                             {questions.map(q => (
                                 <div key={q.id} className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-lg">
-                                    <input value={q.text} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, text: e.target.value} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 font-bold mb-4 outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <div className="flex gap-4 mb-4">
+                                        <div className="flex-1">
+                                            <input value={q.text} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, text: e.target.value} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 font-bold mb-2 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Título da Pergunta" />
+                                            <input value={q.description || ''} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, description: e.target.value} : item))} className="w-full bg-slate-800 p-2 rounded-xl border border-slate-700 text-sm outline-none" placeholder="Descrição" />
+                                        </div>
+                                        <button onClick={() => setEditingImg({type: 'q', id: q.id})} className="w-20 h-20 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700 overflow-hidden shrink-0">
+                                            {q.imageUrl ? <img src={q.imageUrl} className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold">ADD FOTO</span>}
+                                        </button>
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {q.answers.map(ans => (
-                                            <div key={ans.id} className="flex gap-2 bg-slate-800/50 p-2 rounded-xl border border-slate-800">
-                                                <input value={ans.text} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: item.answers.map(a => a.id === ans.id ? {...a, text: e.target.value} : a)} : item))} className="flex-1 bg-transparent text-xs font-bold outline-none" />
-                                                <input type="number" value={ans.points} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: item.answers.map(a => a.id === ans.id ? {...a, points: parseInt(e.target.value)} : a)} : item))} className="w-12 bg-slate-800 rounded text-center text-xs" />
+                                            <div key={ans.id} className="flex gap-2 bg-slate-800/50 p-2 rounded-xl border border-slate-800 items-center">
+                                                <button onClick={() => setEditingImg({type: 'a', id: q.id, subId: ans.id})} className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 overflow-hidden shrink-0">
+                                                    {ans.imageUrl ? <img src={ans.imageUrl} className="w-full h-full object-cover" /> : <span className="text-[8px]">FOTO</span>}
+                                                </button>
+                                                <input value={ans.text} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: item.answers.map(a => a.id === ans.id ? {...a, text: e.target.value} : a)} : item))} className="flex-1 bg-transparent text-xs font-bold outline-none" placeholder="Texto da opção" />
+                                                <input type="number" value={ans.points} onChange={e => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: item.answers.map(a => a.id === ans.id ? {...a, points: parseInt(e.target.value)} : a)} : item))} className="w-12 bg-slate-800 rounded text-center text-xs p-1" />
                                             </div>
                                         ))}
                                         <button onClick={() => onUpdateQuestions(questions.map(item => item.id === q.id ? {...item, answers: [...item.answers, {id: Date.now().toString(), text: 'Nova Resposta', points: 0, category: ''}]} : item))} className="text-[10px] font-black uppercase text-blue-400 py-2 border border-dashed border-blue-400/30 rounded-xl hover:bg-blue-400/5">+ Adicionar Opção</button>
@@ -217,11 +256,31 @@
                         <div className="space-y-6">
                             {results.map(r => (
                                 <div key={r.id} className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl">
-                                    <input value={r.title} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, title: e.target.value} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 font-black text-xl mb-4 outline-none" />
-                                    <textarea value={r.description} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, description: e.target.value} : item))} className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 text-slate-400 text-sm h-32 outline-none" />
-                                    <div className="mt-4 flex gap-4">
-                                        <input value={r.ctaUrl} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, ctaUrl: e.target.value} : item))} className="flex-1 bg-slate-800 p-3 rounded-xl border border-slate-700 text-blue-400 text-xs" placeholder="URL do Botão" />
-                                        <input type="number" value={r.minPoints} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, minPoints: parseInt(e.target.value)} : item))} className="w-24 bg-slate-800 p-3 rounded-xl border border-slate-700 text-center" placeholder="Min Pts" />
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="md:col-span-2 space-y-4">
+                                            <input value={r.title} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, title: e.target.value} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 font-black text-xl outline-none" placeholder="Título do Resultado" />
+                                            <textarea value={r.description} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, description: e.target.value} : item))} className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 text-slate-400 text-sm h-32 outline-none" placeholder="Descrição do Resultado" />
+                                            <div className="flex gap-4">
+                                                <input value={r.ctaText} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, ctaText: e.target.value} : item))} className="flex-1 bg-slate-800 p-3 rounded-xl border border-slate-700 text-xs font-bold" placeholder="Texto do Botão" />
+                                                <input value={r.ctaUrl} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, ctaUrl: e.target.value} : item))} className="flex-1 bg-slate-800 p-3 rounded-xl border border-slate-700 text-blue-400 text-xs" placeholder="URL do Botão" />
+                                            </div>
+                                            <div className="flex gap-4">
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] text-slate-500 uppercase font-black block mb-1">Pontos Mínimos</label>
+                                                    <input type="number" value={r.minPoints} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, minPoints: parseInt(e.target.value)} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 text-center" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] text-slate-500 uppercase font-black block mb-1">Pontos Máximos</label>
+                                                    <input type="number" value={r.maxPoints} onChange={e => onUpdateResults(results.map(item => item.id === r.id ? {...item, maxPoints: parseInt(e.target.value)} : item))} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 text-center" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => setEditingImg({type: 'r', id: r.id})} className="aspect-video md:aspect-auto w-full bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden flex items-center justify-center relative group">
+                                            {r.imageUrl ? <img src={r.imageUrl} className="w-full h-full object-cover" /> : <span className="font-bold text-sm">ADD FOTO DE CAPA</span>}
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                <span className="text-white font-black text-xs uppercase">Trocar Foto</span>
+                                            </div>
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -264,9 +323,9 @@
                     ) : !isLoggedIn ? (
                         <div className="min-h-screen flex items-center justify-center p-4">
                             <form onSubmit={e => { e.preventDefault(); if (password === 'admin123') setIsLoggedIn(true); else alert('Senha: admin123'); }} className="bg-slate-900 p-8 rounded-3xl border border-slate-800 w-full max-w-sm shadow-2xl">
-                                <h2 className="text-2xl font-black mb-6 text-center">Admin Access</h2>
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-xl mb-6 text-center font-bold outline-none" placeholder="Senha: admin123" />
-                                <button className="w-full py-4 bg-blue-600 rounded-xl font-black uppercase tracking-widest text-xs">Entrar</button>
+                                <h2 className="text-2xl font-black mb-6 text-center text-white">Admin Access</h2>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-xl mb-6 text-center font-bold outline-none text-white focus:border-blue-500 transition-colors" placeholder="Senha: admin123" />
+                                <button className="w-full py-4 bg-blue-600 rounded-xl font-black uppercase tracking-widest text-xs text-white hover:bg-blue-500 transition-colors">Entrar</button>
                             </form>
                         </div>
                     ) : (
@@ -280,7 +339,7 @@
                         />
                     )}
                     
-                    <footer className="text-center py-12 opacity-20 text-[10px] font-black uppercase tracking-[0.4em] pointer-events-none">
+                    <footer className="text-center py-12 opacity-20 text-[10px] font-black uppercase tracking-[0.4em] pointer-events-none text-white">
                         &copy; 2025 ConversionQuiz Pro • Premium Funnel
                     </footer>
                 </div>
